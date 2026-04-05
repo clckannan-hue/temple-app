@@ -199,19 +199,29 @@ def get_all_receipts_history():
 # TAB 1: டேஷ்போர்டு (Dashboard)
 # ==========================================
 with tab1:
+    # Refresh Button சேர்க்கப்பட்டுள்ளது
+    if st.button("🔄 டேட்டாவை புதுப்பிக்க (Refresh Data)", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
     try:
         df_receipts = load_data("SELECT SUM(amount) as total_income FROM receipts")
         df_expenses = load_data("SELECT SUM(amount) as total_expense FROM expenses")
+        df_opening = load_data("SELECT SUM(amount) as total_opening FROM opening_balances") # தொடக்க இருப்பு எடுக்கப்படுகிறது
         
         total_income = df_receipts['total_income'][0] if not df_receipts.empty and pd.notna(df_receipts['total_income'][0]) else 0
         total_expense = df_expenses['total_expense'][0] if not df_expenses.empty and pd.notna(df_expenses['total_expense'][0]) else 0
-        current_balance = total_income - total_expense
+        total_opening = df_opening['total_opening'][0] if not df_opening.empty and pd.notna(df_opening['total_opening'][0]) else 0
+        
+        # சரியான கையிருப்பு கணக்கீடு
+        current_balance = total_opening + total_income - total_expense
 
         col1, col2, col3 = st.columns(3)
         col1.metric(label="🟢 வரவு", value=f"₹ {int(total_income):,}")
         col2.metric(label="🔴 செலவு", value=f"₹ {int(total_expense):,}")
         col3.metric(label="💰 இருப்பு", value=f"₹ {int(current_balance):,}")
-
+        
+        st.caption(f"*(குறிப்பு: கையிருப்பு = தொடக்க இருப்பு ₹{int(total_opening):,} + வரவு - செலவு)*")
         st.divider()
 
         st.subheader("சமீபத்திய ரசீதுகள் (வரவு)")
@@ -397,7 +407,6 @@ with tab4:
         with col2:
             exp_amount = st.number_input("தொகை (Amount Rs) *", min_value=1, step=50)
             
-        # செலவு வகைகள் உங்கள் புகைப்படத்தில் உள்ளபடி அப்டேட் செய்யப்பட்டுள்ளது
         exp_category = st.selectbox("செலவு வகை (Category) *", [
             "பூக்கள் / மாலை", 
             "மின்சாரம்", 
