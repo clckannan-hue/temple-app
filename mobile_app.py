@@ -162,19 +162,36 @@ def create_pdf(receipt_no, date, name, relation, mobile, purpose, amount, amount
     pdf.output(filename)
     return filename
 
-
-@st.cache_data(ttl=5) 
+# ==========================================
+# SUPER FAST DATA LOADING (Cache Optimized)
+# ==========================================
+# Cache time increased to 1 Hour (3600 seconds)
+@st.cache_data(ttl=3600) 
 def load_data(query):
     conn = psycopg2.connect(NEON_URL)
     df = pd.read_sql(query, conn)
     conn.close()
     return df
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=3600)
 def get_all_donors():
     conn = psycopg2.connect(NEON_URL)
     cur = conn.cursor()
     cur.execute("SELECT mobile, name, relation, address, thalaikattu FROM donors")
+    data = cur.fetchall()
+    conn.close()
+    return data
+
+@st.cache_data(ttl=3600)
+def get_all_receipts_history():
+    conn = psycopg2.connect(NEON_URL)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT r.receipt_no, r.date, r.mobile, d.name, d.relation, r.purpose, r.amount 
+        FROM receipts r 
+        LEFT JOIN donors d ON r.mobile = d.mobile 
+        ORDER BY r.receipt_no DESC LIMIT 100
+    """)
     data = cur.fetchall()
     conn.close()
     return data
@@ -284,6 +301,8 @@ with tab2:
                 
                 conn.commit()
                 conn.close()
+                
+                # மிக முக்கியம்: புதிய ரசீது போட்டதும் பழைய மெமரியை அழித்தல்
                 st.cache_data.clear()
                 
                 st.success("✅ தரவுகள் வெற்றிகரமாக கிளவுடில் சேமிக்கப்பட்டன!")
@@ -324,16 +343,8 @@ with tab3:
     st.info("💡 நீங்கள் டவுன்லோட் செய்யத் தவறிய அல்லது பழைய ரசீதுகளை இங்கிருந்து மீண்டும் PDF-ஆக எடுத்துக்கொள்ளலாம்.")
     
     try:
-        conn = psycopg2.connect(NEON_URL)
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT r.receipt_no, r.date, r.mobile, d.name, d.relation, r.purpose, r.amount 
-            FROM receipts r 
-            LEFT JOIN donors d ON r.mobile = d.mobile 
-            ORDER BY r.receipt_no DESC LIMIT 100
-        """)
-        all_recs = cur.fetchall()
-        conn.close()
+        # Cache செய்யப்பட்ட ஃபங்ஷனைப் பயன்படுத்துகிறோம்
+        all_recs = get_all_receipts_history()
 
         if all_recs:
             rec_options = [f"ரசீது எண்: {r[0]} | {r[3]} | {r[5]} (Rs.{int(r[6])})" for r in all_recs]
@@ -343,7 +354,6 @@ with tab3:
                 sel_no = int(selected_rec_str.split(" | ")[0].replace("ரசீது எண்: ", ""))
                 rec_data = next(r for r in all_recs if r[0] == sel_no)
                 
-                # பிழையைத் தவிர்க்கும் முக்கிய திருத்தம்: தொகையை முழு எண்ணாக மாற்றுதல் (int)
                 amt = int(rec_data[6]) 
                 
                 # PDF உருவாக்குதல்
