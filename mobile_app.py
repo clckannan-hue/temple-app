@@ -163,7 +163,7 @@ def create_pdf(receipt_no, date, name, relation, mobile, purpose, amount, amount
     return filename
 
 # ==========================================
-# SUPER FAST DATA LOADING (Cache Optimized)
+# SUPER FAST DATA LOADING
 # ==========================================
 @st.cache_data(ttl=3600) 
 def load_data(query):
@@ -214,7 +214,6 @@ with tab1:
         
         current_balance = total_opening + total_income - total_expense
 
-        # 4 காலம்களாக மாற்றப்பட்டுள்ளது
         col1, col2, col3, col4 = st.columns(4)
         col1.metric(label="🏦 தொடக்க இருப்பு", value=f"₹ {int(total_opening):,}")
         col2.metric(label="🟢 வரவு", value=f"₹ {int(total_income):,}")
@@ -406,6 +405,7 @@ with tab4:
         with col2:
             exp_amount = st.number_input("தொகை (Amount Rs) *", min_value=1, step=50)
             
+        # புதிய "நிலையான வைப்பு நிதி (FD)" சேர்க்கப்பட்டுள்ளது
         exp_category = st.selectbox("செலவு வகை (Category) *", [
             "பூக்கள் / மாலை", 
             "மின்சாரம்", 
@@ -414,7 +414,8 @@ with tab4:
             "அன்னதானம்", 
             "பண்டிகை செலவு", 
             "வங்கி செலவுகள்", 
-            "இதர செலவுகள்"
+            "இதர செலவுகள்",
+            "நிலையான வைப்பு நிதி (FD)"
         ])
         
         exp_desc = st.text_area("குறிப்பு (Description)")
