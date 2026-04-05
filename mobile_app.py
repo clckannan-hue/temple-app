@@ -14,7 +14,8 @@ st.set_page_config(page_title="காங்கேயன் கோவில்", 
 st.markdown("<h2 style='text-align: center; color: darkred;'>அருள்மிகு காங்கேயன் கோவில்</h2>", unsafe_allow_html=True)
 st.divider()
 
-tab1, tab2 = st.tabs(["📊 டேஷ்போர்டு", "✍️ புதிய ரசீது போடுக"])
+# இப்போது 3 பக்கங்கள் (Tabs)
+tab1, tab2, tab3 = st.tabs(["📊 டேஷ்போர்டு", "✍️ புதிய ரசீது", "🖨️ பழைய ரசீது"])
 
 # ==========================================
 # NUMBER TO TAMIL WORDS LOGIC
@@ -44,7 +45,7 @@ def num_to_tamil_words(n):
     return str(n)
 
 # ==========================================
-# PDF CREATION LOGIC (From Desktop App)
+# PDF CREATION LOGIC
 # ==========================================
 def create_pdf(receipt_no, date, name, relation, mobile, purpose, amount, amount_words):
     filename = f"Receipt_{receipt_no}.pdf"
@@ -210,7 +211,7 @@ with tab1:
         st.error(f"டேட்டாபேஸ் இணைப்புப் பிழை: {e}")
 
 # ==========================================
-# TAB 2: மொபைலில் புதிய ரசீது போடும் வசதி
+# TAB 2: புதிய ரசீது போடும் வசதி
 # ==========================================
 with tab2:
     st.subheader("புதிய நன்கொடை பதிவு")
@@ -290,10 +291,8 @@ with tab2:
                 st.markdown("### 🧾 உங்களின் PDF ரசீதுகள்:")
                 
                 for rec in generated_receipts:
-                    # PDF உருவாக்குதல்
                     pdf_filename = create_pdf(rec['no'], date_today, name, relation, mobile, rec['purpose'], rec['amt'], num_to_tamil_words(rec['amt']))
                     
-                    # PDF-ஐ டவுன்லோட் செய்ய பட்டன்
                     if pdf_filename and os.path.exists(pdf_filename):
                         with open(pdf_filename, "rb") as pdf_file:
                             pdf_bytes = pdf_file.read()
@@ -305,6 +304,7 @@ with tab2:
                                 data=pdf_bytes,
                                 file_name=f"Kangeyan_Temple_Receipt_{rec['no']}.pdf",
                                 mime="application/pdf",
+                                key=f"dl_btn_{rec['no']}",
                                 use_container_width=True
                             )
                         with colB:
@@ -315,5 +315,56 @@ with tab2:
                 
             except Exception as e:
                 st.error(f"❌ பிழை ஏற்பட்டது: {e}")
+
+# ==========================================
+# TAB 3: பழைய ரசீது டவுன்லோட் (Reprint)
+# ==========================================
+with tab3:
+    st.subheader("🖨️ பழைய ரசீதை மீண்டும் எடுக்க")
+    st.info("💡 நீங்கள் டவுன்லோட் செய்யத் தவறிய அல்லது பழைய ரசீதுகளை இங்கிருந்து மீண்டும் PDF-ஆக எடுத்துக்கொள்ளலாம்.")
+    
+    try:
+        conn = psycopg2.connect(NEON_URL)
+        cur = conn.cursor()
+        # சமீபத்திய 100 ரசீதுகளை எடுக்கிறோம்
+        cur.execute("""
+            SELECT r.receipt_no, r.date, r.mobile, d.name, d.relation, r.purpose, r.amount 
+            FROM receipts r 
+            LEFT JOIN donors d ON r.mobile = d.mobile 
+            ORDER BY r.receipt_no DESC LIMIT 100
+        """)
+        all_recs = cur.fetchall()
+        conn.close()
+
+        if all_recs:
+            rec_options = [f"ரசீது எண்: {r[0]} | {r[3]} | {r[5]} (Rs.{r[6]})" for r in all_recs]
+            selected_rec_str = st.selectbox("டவுன்லோட் செய்ய வேண்டிய ரசீதைத் தேர்ந்தெடுக்கவும்:", ["-- தேர்ந்தெடுக்கவும் --"] + rec_options)
+            
+            if selected_rec_str != "-- தேர்ந்தெடுக்கவும் --":
+                # ரசீது எண்ணைப் பிரித்தெடுத்தல்
+                sel_no = int(selected_rec_str.split(" | ")[0].replace("ரசீது எண்: ", ""))
+                rec_data = next(r for r in all_recs if r[0] == sel_no)
+                
+                # PDF உருவாக்குதல்
+                pdf_file = create_pdf(rec_data[0], rec_data[1], rec_data[3], rec_data[4] if rec_data[4] else "", rec_data[2], rec_data[5], rec_data[6], num_to_tamil_words(rec_data[6]))
+                
+                if pdf_file and os.path.exists(pdf_file):
+                    with open(pdf_file, "rb") as f:
+                        pdf_bytes = f.read()
+                    
+                    st.write("---")
+                    st.success(f"ரசீது எண் {sel_no} டவுன்லோட் செய்யத் தயார்!")
+                    st.download_button(
+                        label=f"📄 ரசீது {sel_no}-ஐ டவுன்லோட் செய்யவும்", 
+                        data=pdf_bytes, 
+                        file_name=f"Receipt_{sel_no}.pdf", 
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+        else:
+            st.warning("ரசீதுகள் எதுவும் காணப்படவில்லை.")
+            
+    except Exception as e:
+        st.error(f"பிழை: {e}")
 
 st.caption("Developed for Kangeyan Temple by G.S. Kannan")
