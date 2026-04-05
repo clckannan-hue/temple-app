@@ -199,7 +199,6 @@ def get_all_receipts_history():
 # TAB 1: டேஷ்போர்டு (Dashboard)
 # ==========================================
 with tab1:
-    # Refresh Button சேர்க்கப்பட்டுள்ளது
     if st.button("🔄 டேட்டாவை புதுப்பிக்க (Refresh Data)", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
@@ -207,21 +206,21 @@ with tab1:
     try:
         df_receipts = load_data("SELECT SUM(amount) as total_income FROM receipts")
         df_expenses = load_data("SELECT SUM(amount) as total_expense FROM expenses")
-        df_opening = load_data("SELECT SUM(amount) as total_opening FROM opening_balances") # தொடக்க இருப்பு எடுக்கப்படுகிறது
+        df_opening = load_data("SELECT SUM(amount) as total_opening FROM opening_balances")
         
         total_income = df_receipts['total_income'][0] if not df_receipts.empty and pd.notna(df_receipts['total_income'][0]) else 0
         total_expense = df_expenses['total_expense'][0] if not df_expenses.empty and pd.notna(df_expenses['total_expense'][0]) else 0
         total_opening = df_opening['total_opening'][0] if not df_opening.empty and pd.notna(df_opening['total_opening'][0]) else 0
         
-        # சரியான கையிருப்பு கணக்கீடு
         current_balance = total_opening + total_income - total_expense
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric(label="🟢 வரவு", value=f"₹ {int(total_income):,}")
-        col2.metric(label="🔴 செலவு", value=f"₹ {int(total_expense):,}")
-        col3.metric(label="💰 இருப்பு", value=f"₹ {int(current_balance):,}")
+        # 4 காலம்களாக மாற்றப்பட்டுள்ளது
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(label="🏦 தொடக்க இருப்பு", value=f"₹ {int(total_opening):,}")
+        col2.metric(label="🟢 வரவு", value=f"₹ {int(total_income):,}")
+        col3.metric(label="🔴 செலவு", value=f"₹ {int(total_expense):,}")
+        col4.metric(label="💰 கையிருப்பு", value=f"₹ {int(current_balance):,}")
         
-        st.caption(f"*(குறிப்பு: கையிருப்பு = தொடக்க இருப்பு ₹{int(total_opening):,} + வரவு - செலவு)*")
         st.divider()
 
         st.subheader("சமீபத்திய ரசீதுகள் (வரவு)")
@@ -442,7 +441,7 @@ with tab4:
                     conn.commit()
                     conn.close()
                     
-                    st.cache_data.clear() # டேஷ்போர்டை Refresh செய்ய
+                    st.cache_data.clear()
                     st.success(f"✅ செலவு (Rs.{exp_amount}) வெற்றிகரமாக கிளவுடில் பதியப்பட்டது!")
                 except Exception as e:
                     st.error(f"❌ பிழை: {e}")
