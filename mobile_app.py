@@ -14,7 +14,7 @@ st.set_page_config(page_title="காங்கேயன் கோவில்", 
 st.markdown("<h2 style='text-align: center; color: darkred;'>அருள்மிகு காங்கேயன் கோவில்</h2>", unsafe_allow_html=True)
 st.divider()
 
-# இப்போது 4 பக்கங்கள் (Tabs)
+# 4 பக்கங்கள் (Tabs)
 tab1, tab2, tab3, tab4 = st.tabs(["📊 டேஷ்போர்டு", "✍️ ரசீது", "🖨️ பழைய ரசீது", "💸 செலவுகள்"])
 
 # ==========================================
@@ -397,7 +397,18 @@ with tab4:
         with col2:
             exp_amount = st.number_input("தொகை (Amount Rs) *", min_value=1, step=50)
             
-        exp_category = st.selectbox("செலவு வகை (Category) *", ["மாதாந்திர பூஜை", "சிவராத்திரி", "மின்சாரம்", "பராமரிப்பு", "சம்பளம்", "இதர செலவுகள்"])
+        # செலவு வகைகள் உங்கள் புகைப்படத்தில் உள்ளபடி அப்டேட் செய்யப்பட்டுள்ளது
+        exp_category = st.selectbox("செலவு வகை (Category) *", [
+            "பூக்கள் / மாலை", 
+            "மின்சாரம்", 
+            "சம்பளம்", 
+            "பராமரிப்பு", 
+            "அன்னதானம்", 
+            "பண்டிகை செலவு", 
+            "வங்கி செலவுகள்", 
+            "இதர செலவுகள்"
+        ])
+        
         exp_desc = st.text_area("குறிப்பு (Description)")
         
         col3, col4 = st.columns(2)
@@ -423,7 +434,7 @@ with tab4:
                     conn.close()
                     
                     st.cache_data.clear() # டேஷ்போர்டை Refresh செய்ய
-                    st.success(f"✅ செலவு (Rs.{exp_amount}) வெற்றிகரமாகப் கிளவுடில் பதியப்பட்டது!")
+                    st.success(f"✅ செலவு (Rs.{exp_amount}) வெற்றிகரமாக கிளவுடில் பதியப்பட்டது!")
                 except Exception as e:
                     st.error(f"❌ பிழை: {e}")
 
