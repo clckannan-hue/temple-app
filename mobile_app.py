@@ -16,12 +16,21 @@ st.divider()
 tab1, tab2 = st.tabs(["📊 டேஷ்போர்டு", "✍️ புதிய ரசீது போடுக"])
 
 # Cloud-ல் இருந்து டேட்டாவை எடுக்கும் Function
-@st.cache_data(ttl=5) # 5 விநாடிக்கு ஒருமுறை Refresh ஆகும்
+@st.cache_data(ttl=5) 
 def load_data(query):
     conn = psycopg2.connect(NEON_URL)
     df = pd.read_sql(query, conn)
     conn.close()
     return df
+
+@st.cache_data(ttl=5)
+def get_all_donors():
+    conn = psycopg2.connect(NEON_URL)
+    cur = conn.cursor()
+    cur.execute("SELECT mobile, name, relation, address FROM donors")
+    data = cur.fetchall()
+    conn.close()
+    return data
 
 # ==========================================
 # TAB 1: டேஷ்போர்டு (Dashboard)
@@ -60,12 +69,39 @@ with tab1:
 with tab2:
     st.subheader("புதிய நன்கொடை பதிவு")
     
-    # Form உருவாக்குதல்
+    # 1. டேட்டாபேஸில் உள்ள பழைய முகவரிகளை எடுப்பது
+    try:
+        donors_data = get_all_donors()
+        donor_options = ["➕ புதிய பக்தர் (New Donor)"] + [f"{d[0]} - {d[1]}" for d in donors_data]
+    except:
+        donors_data = []
+        donor_options = ["➕ புதிய பக்தர் (New Donor)"]
+
+    # 2. Search Box: இங்கே டைப் செய்தால் பில்டர் ஆகும்!
+    selected_option = st.selectbox("🔍 பழைய பக்தரைத் தேடுக (Search by Mobile/Name)", donor_options)
+    
+    # 3. தேர்ந்தெடுக்கப்பட்ட பக்தரின் டேட்டாவை பிரித்தெடுத்தல்
+    def_mob = ""
+    def_name = ""
+    def_rel = ""
+    def_add = ""
+    
+    if selected_option != "➕ புதிய பக்தர் (New Donor)":
+        sel_mob = selected_option.split(" - ")[0]
+        for d in donors_data:
+            if d[0] == sel_mob:
+                def_mob = d[0]
+                def_name = d[1]
+                def_rel = d[2] if d[2] else ""
+                def_add = d[3] if d[3] else ""
+                break
+    
+    # 4. Form உருவாக்குதல்
     with st.form("receipt_form", clear_on_submit=True):
-        mobile = st.text_input("மொபைல் எண் (Mobile No) *", max_chars=10)
-        name = st.text_input("பெயர் (Name) *")
-        relation = st.text_input("த/பெ (அ) க/பெ (Relation)")
-        address = st.text_area("முகவரி (Address)")
+        mobile = st.text_input("மொபைல் எண் (Mobile No) *", value=def_mob, max_chars=10)
+        name = st.text_input("பெயர் (Name) *", value=def_name)
+        relation = st.text_input("த/பெ (அ) க/பெ (Relation)", value=def_rel)
+        address = st.text_area("முகவரி (Address)", value=def_add)
         
         purpose = st.selectbox("நன்கொடை விவரம் *", ["சிவராத்திரி பூஜை", "மாதாந்திர பூஜை", "அபிஷேகம்", "பொது நன்கொடை"])
         pay_mode = st.selectbox("பணம் செலுத்தும் முறை", ["பணம் (Cash)", "UPI (GPay/PhonePe)", "Bank Transfer"])
@@ -103,7 +139,7 @@ with tab2:
                     conn.commit()
                     conn.close()
                     
-                    st.success(f"✅ அருமை! {name} அவர்களின் நன்கொடை (Rs.{amount}) வெற்றிகரமாக சேமிக்கப்பட்டது! (ரசீது எண்: {new_receipt_no})")
+                    st.success(f"✅ அருமை! {name} அவர்களின் நன்கொடை (Rs.{amount}) சேமிக்கப்பட்டது! (ரசீது எண்: {new_receipt_no})")
                     
                     # டேஷ்போர்டை Refresh செய்ய
                     st.cache_data.clear()
