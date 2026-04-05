@@ -14,8 +14,8 @@ st.set_page_config(page_title="காங்கேயன் கோவில்", 
 st.markdown("<h2 style='text-align: center; color: darkred;'>அருள்மிகு காங்கேயன் கோவில்</h2>", unsafe_allow_html=True)
 st.divider()
 
-# 3 பக்கங்கள் (Tabs)
-tab1, tab2, tab3 = st.tabs(["📊 டேஷ்போர்டு", "✍️ புதிய ரசீது", "🖨️ பழைய ரசீது"])
+# இப்போது 4 பக்கங்கள் (Tabs)
+tab1, tab2, tab3, tab4 = st.tabs(["📊 டேஷ்போர்டு", "✍️ ரசீது", "🖨️ பழைய ரசீது", "💸 செலவுகள்"])
 
 # ==========================================
 # NUMBER TO TAMIL WORDS LOGIC
@@ -165,7 +165,6 @@ def create_pdf(receipt_no, date, name, relation, mobile, purpose, amount, amount
 # ==========================================
 # SUPER FAST DATA LOADING (Cache Optimized)
 # ==========================================
-# Cache time increased to 1 Hour (3600 seconds)
 @st.cache_data(ttl=3600) 
 def load_data(query):
     conn = psycopg2.connect(NEON_URL)
@@ -215,14 +214,22 @@ with tab1:
 
         st.divider()
 
-        st.subheader("சமீபத்திய ரசீதுகள்")
+        st.subheader("சமீபத்திய ரசீதுகள் (வரவு)")
         recent_receipts = load_data("""
             SELECT r.receipt_no as "எண்", r.date as "தேதி", d.name as "பெயர்", r.amount as "தொகை", r.purpose as "விவரம்" 
             FROM receipts r 
             LEFT JOIN donors d ON r.mobile = d.mobile 
-            ORDER BY r.receipt_no DESC LIMIT 10
+            ORDER BY r.receipt_no DESC LIMIT 5
         """)
         st.dataframe(recent_receipts, use_container_width=True, hide_index=True)
+
+        st.subheader("சமீபத்திய செலவுகள் (செலவு)")
+        recent_expenses = load_data("""
+            SELECT expense_id as "எண்", date as "தேதி", category as "வகை", amount as "தொகை", spent_by as "செய்தவர்" 
+            FROM expenses 
+            ORDER BY expense_id DESC LIMIT 5
+        """)
+        st.dataframe(recent_expenses, use_container_width=True, hide_index=True)
 
     except Exception as e:
         st.error(f"டேட்டாபேஸ் இணைப்புப் பிழை: {e}")
@@ -301,8 +308,6 @@ with tab2:
                 
                 conn.commit()
                 conn.close()
-                
-                # மிக முக்கியம்: புதிய ரசீது போட்டதும் பழைய மெமரியை அழித்தல்
                 st.cache_data.clear()
                 
                 st.success("✅ தரவுகள் வெற்றிகரமாக கிளவுடில் சேமிக்கப்பட்டன!")
@@ -343,7 +348,6 @@ with tab3:
     st.info("💡 நீங்கள் டவுன்லோட் செய்யத் தவறிய அல்லது பழைய ரசீதுகளை இங்கிருந்து மீண்டும் PDF-ஆக எடுத்துக்கொள்ளலாம்.")
     
     try:
-        # Cache செய்யப்பட்ட ஃபங்ஷனைப் பயன்படுத்துகிறோம்
         all_recs = get_all_receipts_history()
 
         if all_recs:
@@ -356,7 +360,6 @@ with tab3:
                 
                 amt = int(rec_data[6]) 
                 
-                # PDF உருவாக்குதல்
                 pdf_file = create_pdf(rec_data[0], rec_data[1], rec_data[3], rec_data[4] if rec_data[4] else "", rec_data[2], rec_data[5], amt, num_to_tamil_words(amt))
                 
                 if pdf_file and os.path.exists(pdf_file):
@@ -377,5 +380,51 @@ with tab3:
             
     except Exception as e:
         st.error(f"பிழை: {e}")
+
+# ==========================================
+# TAB 4: செலவுகள் பதிவு (Expenses)
+# ==========================================
+with tab4:
+    st.subheader("💸 புதிய செலவு பதிவு")
+    st.info("💡 கோவிலின் மாதாந்திர மற்றும் இதர செலவுகளை இங்கே பதிவு செய்து கொள்ளலாம்.")
+    
+    with st.form("expense_form", clear_on_submit=True):
+        date_today = datetime.now().strftime("%d-%m-%Y")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            exp_date = st.text_input("தேதி (Date) *", value=date_today)
+        with col2:
+            exp_amount = st.number_input("தொகை (Amount Rs) *", min_value=1, step=50)
+            
+        exp_category = st.selectbox("செலவு வகை (Category) *", ["மாதாந்திர பூஜை", "சிவராத்திரி", "மின்சாரம்", "பராமரிப்பு", "சம்பளம்", "இதர செலவுகள்"])
+        exp_desc = st.text_area("குறிப்பு (Description)")
+        
+        col3, col4 = st.columns(2)
+        with col3:
+            exp_spent_by = st.text_input("செலவு செய்தவர் (Spent By) *")
+        with col4:
+            exp_pay_mode = st.selectbox("பணம் செலுத்தும் முறை", ["பணம் (Cash)", "UPI (GPay/PhonePe)", "Bank Transfer"])
+        
+        submitted_exp = st.form_submit_button("செலவைச் சேமிக்க (Save Expense)", use_container_width=True)
+        
+        if submitted_exp:
+            if not exp_amount or not exp_spent_by:
+                st.error("⚠️ தொகையையும், செலவு செய்தவர் பெயரையும் கட்டாயம் நிரப்பவும்!")
+            else:
+                try:
+                    conn = psycopg2.connect(NEON_URL)
+                    cur = conn.cursor()
+                    cur.execute("""
+                        INSERT INTO expenses (date, category, amount, description, spent_by, pay_mode) 
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    """, (exp_date, exp_category, exp_amount, exp_desc, exp_spent_by, exp_pay_mode))
+                    conn.commit()
+                    conn.close()
+                    
+                    st.cache_data.clear() # டேஷ்போர்டை Refresh செய்ய
+                    st.success(f"✅ செலவு (Rs.{exp_amount}) வெற்றிகரமாகப் கிளவுடில் பதியப்பட்டது!")
+                except Exception as e:
+                    st.error(f"❌ பிழை: {e}")
 
 st.caption("Developed for Kangeyan Temple by G.S. Kannan")
