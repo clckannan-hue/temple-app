@@ -14,7 +14,7 @@ st.set_page_config(page_title="காங்கேயன் கோவில்", 
 st.markdown("<h2 style='text-align: center; color: darkred;'>அருள்மிகு காங்கேயன் கோவில்</h2>", unsafe_allow_html=True)
 st.divider()
 
-# இப்போது 3 பக்கங்கள் (Tabs)
+# 3 பக்கங்கள் (Tabs)
 tab1, tab2, tab3 = st.tabs(["📊 டேஷ்போர்டு", "✍️ புதிய ரசீது", "🖨️ பழைய ரசீது"])
 
 # ==========================================
@@ -192,9 +192,9 @@ with tab1:
         current_balance = total_income - total_expense
 
         col1, col2, col3 = st.columns(3)
-        col1.metric(label="🟢 வரவு", value=f"₹ {total_income:,.0f}")
-        col2.metric(label="🔴 செலவு", value=f"₹ {total_expense:,.0f}")
-        col3.metric(label="💰 இருப்பு", value=f"₹ {current_balance:,.0f}")
+        col1.metric(label="🟢 வரவு", value=f"₹ {int(total_income):,}")
+        col2.metric(label="🔴 செலவு", value=f"₹ {int(total_expense):,}")
+        col3.metric(label="💰 இருப்பு", value=f"₹ {int(current_balance):,}")
 
         st.divider()
 
@@ -277,10 +277,10 @@ with tab2:
                     amt2 = amount - 500
                     if amt2 > 0:
                         cur.execute("INSERT INTO receipts (mobile, amount, purpose, date, pay_mode) VALUES (%s, %s, %s, %s, %s) RETURNING receipt_no", (mobile, amt2, "சிவராத்திரி நன்கொடை", date_today, pay_mode))
-                        generated_receipts.append({"no": cur.fetchone()[0], "purpose": "சிவராத்திரி நன்கொடை", "amt": amt2})
+                        generated_receipts.append({"no": cur.fetchone()[0], "purpose": "சிவராத்திரி நன்கொடை", "amt": int(amt2)})
                 else:
                     cur.execute("INSERT INTO receipts (mobile, amount, purpose, date, pay_mode) VALUES (%s, %s, %s, %s, %s) RETURNING receipt_no", (mobile, amount, purpose, date_today, pay_mode))
-                    generated_receipts.append({"no": cur.fetchone()[0], "purpose": purpose, "amt": amount})
+                    generated_receipts.append({"no": cur.fetchone()[0], "purpose": purpose, "amt": int(amount)})
                 
                 conn.commit()
                 conn.close()
@@ -326,7 +326,6 @@ with tab3:
     try:
         conn = psycopg2.connect(NEON_URL)
         cur = conn.cursor()
-        # சமீபத்திய 100 ரசீதுகளை எடுக்கிறோம்
         cur.execute("""
             SELECT r.receipt_no, r.date, r.mobile, d.name, d.relation, r.purpose, r.amount 
             FROM receipts r 
@@ -337,27 +336,29 @@ with tab3:
         conn.close()
 
         if all_recs:
-            rec_options = [f"ரசீது எண்: {r[0]} | {r[3]} | {r[5]} (Rs.{r[6]})" for r in all_recs]
+            rec_options = [f"ரசீது எண்: {r[0]} | {r[3]} | {r[5]} (Rs.{int(r[6])})" for r in all_recs]
             selected_rec_str = st.selectbox("டவுன்லோட் செய்ய வேண்டிய ரசீதைத் தேர்ந்தெடுக்கவும்:", ["-- தேர்ந்தெடுக்கவும் --"] + rec_options)
             
             if selected_rec_str != "-- தேர்ந்தெடுக்கவும் --":
-                # ரசீது எண்ணைப் பிரித்தெடுத்தல்
                 sel_no = int(selected_rec_str.split(" | ")[0].replace("ரசீது எண்: ", ""))
                 rec_data = next(r for r in all_recs if r[0] == sel_no)
                 
+                # பிழையைத் தவிர்க்கும் முக்கிய திருத்தம்: தொகையை முழு எண்ணாக மாற்றுதல் (int)
+                amt = int(rec_data[6]) 
+                
                 # PDF உருவாக்குதல்
-                pdf_file = create_pdf(rec_data[0], rec_data[1], rec_data[3], rec_data[4] if rec_data[4] else "", rec_data[2], rec_data[5], rec_data[6], num_to_tamil_words(rec_data[6]))
+                pdf_file = create_pdf(rec_data[0], rec_data[1], rec_data[3], rec_data[4] if rec_data[4] else "", rec_data[2], rec_data[5], amt, num_to_tamil_words(amt))
                 
                 if pdf_file and os.path.exists(pdf_file):
                     with open(pdf_file, "rb") as f:
                         pdf_bytes = f.read()
                     
                     st.write("---")
-                    st.success(f"ரசீது எண் {sel_no} டவுன்லோட் செய்யத் தயார்!")
+                    st.success(f"✅ ரசீது எண் {sel_no} டவுன்லோட் செய்யத் தயார்!")
                     st.download_button(
                         label=f"📄 ரசீது {sel_no}-ஐ டவுன்லோட் செய்யவும்", 
                         data=pdf_bytes, 
-                        file_name=f"Receipt_{sel_no}.pdf", 
+                        file_name=f"Kangeyan_Temple_Receipt_{sel_no}.pdf", 
                         mime="application/pdf",
                         use_container_width=True
                     )
